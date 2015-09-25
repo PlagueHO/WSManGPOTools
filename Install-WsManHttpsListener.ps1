@@ -1,23 +1,34 @@
 ﻿<#
-.Synopsis
+.SYNOPSIS
     Is used to install an HTTPS WSMan Listener on a computer with a valid certificate.
+
 .DESCRIPTION
     This script is designed to be called from a Startup/Logon PowerShell GPO.
     The Distinguished Name of the certificate issuer must be passed to the script.
+
 .PARAMETER Issuer
 The full Distinguished Name of the Issing CA that will have issued the certificate to be used
 for this HTTPS WSMan Listener.
+
 .PARAMETER DNSNameType
 The allowed DNS Name types that will be used to find a matching certificate. Defaults to Both.
+
+.PARAMETER MatchAlternate
+The certificate used must also have an alternate subject name containing the DNS name found in
+the subject as well. Defaults to false.
+
 .PARAMETER Port
 This is the port the HTTPS WSMan Listener will be installed onto. Defaults to 5986.
+
 .EXAMPLE
  Install-WSManHttpsListener -Issuer 'CN=CONTOSO.COM Issuing CA, DC=CONTOSO, DC=COM'
-Install a WSMan HTTPS listener from an appropriate machine certificate issued by 'CN=LABBUILDER.COM Issuing CA, DC=LABBUILDER, DC=COM'.
+Install a WSMan HTTPS listener from an appropriate machine certificate issued by
+'CN=LABBUILDER.COM Issuing CA, DC=LABBUILDER, DC=COM'.
 
 .EXAMPLE
  Install-WSManHttpsListener -Issuer 'CN=CONTOSO.COM Issuing CA, DC=CONTOSO, DC=COM' -Port 7000
-Install a WSMan HTTPS listener from an appropriate machine certificate issued by 'CN=LABBUILDER.COM Issuing CA, DC=LABBUILDER, DC=COM' on port 7000.
+Install a WSMan HTTPS listener from an appropriate machine certificate issued by
+'CN=LABBUILDER.COM Issuing CA, DC=LABBUILDER, DC=COM' on port 7000.
 
 #>
 [CmdLetBinding()]
@@ -28,8 +39,10 @@ Param (
     [ValidateSet('Both', 'FQDN', 'ComputerName')]
     [String] $DNSNameType = 'Both',
 
+    [Switch] $MatchAlternate = $false,
+
     [Int] $Port = 5986
-)
+) # param
 Try {
     Get-WSManInstance `
         -ResourceURI winrm/config/Listener `
@@ -43,22 +56,38 @@ Try {
 # First try and find a certificate that is used to the FQDN of the machine
 if ($DNSNameType -in 'Both','FQDN') {
     [String] $HostName = [System.Net.Dns]::GetHostByName($ENV:computerName).Hostname
-    $Thumbprint = (get-childitem -Path Cert:\localmachine\my | Where-Object { 
-		    ($_.Extensions.EnhancedKeyUsages.FriendlyName -contains 'Server Authentication') -and
-		    ($_.IssuerName.Name -eq $Issuer) -and
-		    ($HostName -in $_.DNSNameList.Unicode) -and
-            ($_.Subject -eq "CN=$HostName") } | Select-Object -First 1
-        ).Thumbprint
+    if ($MatchAlternate) {
+        $Thumbprint = (get-childitem -Path Cert:\localmachine\my | Where-Object { 
+		        ($_.Extensions.EnhancedKeyUsages.FriendlyName -contains 'Server Authentication') -and
+		        ($_.IssuerName.Name -eq $Issuer) -and
+		        ($HostName -in $_.DNSNameList.Unicode) -and
+                ($_.Subject -eq "CN=$HostName") } | Select-Object -First 1
+            ).Thumbprint
+    } else {
+        $Thumbprint = (get-childitem -Path Cert:\localmachine\my | Where-Object { 
+		        ($_.Extensions.EnhancedKeyUsages.FriendlyName -contains 'Server Authentication') -and
+		        ($_.IssuerName.Name -eq $Issuer) -and
+                ($_.Subject -eq "CN=$HostName") } | Select-Object -First 1
+            ).Thumbprint    
+    } # if
 }
 if (($DNSNameType -in 'Both','ComputerName') -and -not $Thumbprint) {
     # If could not find an FQDN cert, try for one issued to the computer name
     [String] $HostName = $ENV:ComputerName
-    $Thumbprint = (get-childitem -Path Cert:\localmachine\my | Where-Object { 
-		    ($_.Extensions.EnhancedKeyUsages.FriendlyName -contains 'Server Authentication') -and
-		    ($_.IssuerName.Name -eq $Issuer) -and
-		    ($HostName -in $_.DNSNameList.Unicode) -and
-            ($_.Subject -eq "CN=$HostName") } | Select-Object -First 1
-        ).Thumbprint
+    if ($MatchAlternate) {
+        $Thumbprint = (get-childitem -Path Cert:\localmachine\my | Where-Object { 
+		        ($_.Extensions.EnhancedKeyUsages.FriendlyName -contains 'Server Authentication') -and
+		        ($_.IssuerName.Name -eq $Issuer) -and
+		        ($HostName -in $_.DNSNameList.Unicode) -and
+                ($_.Subject -eq "CN=$HostName") } | Select-Object -First 1
+            ).Thumbprint
+    } else {
+        $Thumbprint = (get-childitem -Path Cert:\localmachine\my | Where-Object { 
+		        ($_.Extensions.EnhancedKeyUsages.FriendlyName -contains 'Server Authentication') -and
+		        ($_.IssuerName.Name -eq $Issuer) -and
+                ($_.Subject -eq "CN=$HostName") } | Select-Object -First 1
+            ).Thumbprint    
+    } # if
 } # if
 if ($Thumbprint) {
     # A certificate was found, so use it to enable the HTTPS WinRM listener
@@ -70,10 +99,13 @@ if ($Thumbprint) {
             -SelectorSet @{Address='*';Transport='HTTPS'} `
             -ValueSet @{Hostname=$HostName;CertificateThumbprint=$Thumbprint;Port=$Port} `
             -ErrorAction Stop
-        Write-Verbose "The new HTTPS WinRM Listener for '$Hostname' with certificate '$Thumbprint' has been created."
+        Write-Verbose -Message ( @(
+            "The new HTTPS WinRM Listener for '$Hostname' with certificate '$Thumbprint' "
+            'has been created.'
+            ) -join '')
     } Catch {
         Write-Verbose -Message $_
-    }
+    } # try
 } else {
     Write-Verbose -Message ( @(
         'A computer certificate issued by $Issued to this computer with '
