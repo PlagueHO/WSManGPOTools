@@ -4,6 +4,9 @@ WSManGPOTools
 ## Install-WSManHttpsListener
 This PowerShell script can be used to install an HTTPS WSMan Listener on a computer with a valid certificate.
 
+### Changelog
+2015-09-25: Initial Version.
+
 ### Overview
 This script is designed to be called from a Startup/Logon PowerShell GPO. The Distinguished Name of the certificate issuer must be passed to the script. The script can be run outside of a GPO if required.
 
@@ -22,28 +25,28 @@ The WSMan HTTPS Listener is installed to port 5986 by default, but this can be c
 
 Normally, the script will first look for a Server Authentication certificate that has a DNS name matching the FQDN of the computer, and if one can't be found it will look for one using only the computer name. The script can be restricted so that it will only look for FQDN or Computer name rather than both by passing the 
 
-###Autoenrollment Certificate Template
+### Autoenrollment Certificate Template
 Normally this script will be used in conjunction with a Computer Certificate Autoenrollment GPO. If this is the case you should ensure that the Autoenrollment Computer Certificate Template that is being used to issue server certificates should generate a valid Subject containing the computer DNS name (and optionally Alternate Subject as well).
 
-###Parameters
-####Issuer
+### Parameters
+#### Issuer
 The full Distinguished Name of the Issing CA that will have issued the certificate to be used
 for this HTTPS WSMan Listener. It is a required parameter.
 
-####DNSNameType
+#### DNSNameType
 The allowed DNS Name types that will be used to find a matching certificate.
 Default: Both
 
-#####MatchAlternate
+##### MatchAlternate
 The certificate used must also have an alternate subject name containing the DNS name found in
 the subject as well.
 Default:False
 
-####Port
+#### Port
 This is the port the HTTPS WSMan Listener will be installed onto.
 Default:5986
 
-###Examples
+### Examples
 Install a WSMan HTTPS listener from an appropriate machine certificate issued by 'CN=LABBUILDER.COM Issuing CA, DC=LABBUILDER, DC=COM':
 ```powershell
 Install-WSManHttpsListener -Issuer 'CN=CONTOSO.COM Issuing CA, DC=CONTOSO, DC=COM'
