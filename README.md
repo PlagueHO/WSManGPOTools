@@ -7,9 +7,16 @@ This PowerShell script can be used to install an HTTPS WSMan Listener on a compu
 ### Overview
 This script is designed to be called from a Startup/Logon PowerShell GPO. The Distinguished Name of the certificate issuer must be passed to the script.
 
-**The computer MUST have a valid certificate with an Extended Key Usage or Server Authentication and issued by the CA specified in the Issuer parameter passed to the script. The certificate DNS name must contain a name that matches either the FQDN name of the computer or the flat computer name.**
+**The computer MUST have a valid certificate with the following properties:**
 
-If a certificate can't be found that matches the above properties then the WSMan HTTPS listener will not be installed. If a WSMan HTTPS listener already exists on this computer then the script will not execute which allows the script to be set to always run at computer start up.
+- An Extended Key Usage of **Server Authentication**.
+- Issued by the CA specified in the Issuer parameter passed to the script.
+- The **Subject** must contain a **Common Name** that contains either the FQDN computer name or the flat computer name (e.g. CN=SERVER1.CONTOSO.COM or CN=SERVER1)
+- The **Subject Alternamte Name** must contain a **DNS Name** that matches either the FQDN computer name or the flat computer name (e.g. DNS Name=SA_DHCP1.LABBUILDER.COM or DNS Name=SERVER1)
+
+If a certificate can't be found that matches the above properties then the WSMan HTTPS listener will not be installed. Please ensure that at least one computer certificate on each computer matches these properties - it is recommended that you configure a custom autoentrollment computer certificate to ensure the Subject Name and Alternate Subject names are automatically populated.
+
+If a WSMan HTTPS listener already exists on this computer then the script will not execute which allows the script to be set to always run at computer start up.
 
 The WSMan HTTPS Listener is installed to port 5986 by default, but this can be changed by specifying the port parameter.
 
@@ -35,12 +42,12 @@ For more information.
 
 ### Minimum requirements
 
-- PowerShell 4.0
+- PowerShell 2.0
 
 
 ### License and Copyright
 
-Copyright 2014 Daniel Scott-Raynsford
+Copyright 2015 Daniel Scott-Raynsford
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
