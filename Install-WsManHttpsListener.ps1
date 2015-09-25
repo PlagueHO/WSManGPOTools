@@ -37,17 +37,17 @@ Try {
     Write-Verbose 'An HTTPS WinRM Listener already exists for this computer.'
     Return
 } Catch {
-# A listener doesn't exist so can now install one.
+# An error incidcates a listener doesn't exist so we can install one.
 }
-$Issuer = 'CN=LABBUILDER.COM Issuing CA, DC=LABBUILDER, DC=COM'
 [String] $Thumbprint = ''
 # First try and find a certificate that is used to the FQDN of the machine
 if ($DNSNameType -in 'Both','FQDN') {
-    [String] $HostName = 'DA_IT01.LABBUILDER.COM'
+    [String] $HostName = [System.Net.Dns]::GetHostByName($ENV:computerName).Hostname
     $Thumbprint = (get-childitem -Path Cert:\localmachine\my | Where-Object { 
 		    ($_.Extensions.EnhancedKeyUsages.FriendlyName -contains 'Server Authentication') -and
 		    ($_.IssuerName.Name -eq $Issuer) -and
-		    ($HostName -in $_.DNSNameList.Unicode) }
+		    ($HostName -in $_.DNSNameList.Unicode) -and
+            ($_.Subject -eq "CN=$HostName") } | Select-Object -First 1
         ).Thumbprint
 }
 if (($DNSNameType -in 'Both','ComputerName') -and -not $Thumbprint) {
@@ -56,7 +56,8 @@ if (($DNSNameType -in 'Both','ComputerName') -and -not $Thumbprint) {
     $Thumbprint = (get-childitem -Path Cert:\localmachine\my | Where-Object { 
 		    ($_.Extensions.EnhancedKeyUsages.FriendlyName -contains 'Server Authentication') -and
 		    ($_.IssuerName.Name -eq $Issuer) -and
-		    ($HostName -in $_.DNSNameList.Unicode) }
+		    ($HostName -in $_.DNSNameList.Unicode) -and
+            ($_.Subject -eq "CN=$HostName") } | Select-Object -First 1
         ).Thumbprint
 } # if
 if ($Thumbprint) {
@@ -67,14 +68,12 @@ if ($Thumbprint) {
         New-WSManInstance `
             -ResourceURI winrm/config/Listener `
             -SelectorSet @{Address='*';Transport='HTTPS'} `
-            -ValueSet @{Hostname=$HostName;CertificateThumbprint=$Thumbprint} `
-            -Port $Port `
+            -ValueSet @{Hostname=$HostName;CertificateThumbprint=$Thumbprint;Port=$Port} `
             -ErrorAction Stop
+        Write-Verbose "The new HTTPS WinRM Listener for '$Hostname' with certificate '$Thumbprint' has been created."
     } Catch {
-        Write-Verbose -Message `
-            "Creating new HTTPS WinRM Listener for '$Hostname' with certificate '$Thumbprint'..."
+        Write-Verbose -Message $_
     }
-    Write-Verbose "The new HTTPS WinRM Listener for '$Hostname' with certificate '$Thumbprint' has been created."
 } else {
     Write-Verbose -Message ( @(
         'A computer certificate issued by $Issued to this computer with '
