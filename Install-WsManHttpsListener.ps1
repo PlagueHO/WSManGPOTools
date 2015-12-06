@@ -20,6 +20,10 @@ the subject as well. Defaults to false.
 .PARAMETER Port
 This is the port the HTTPS WSMan Listener will be installed onto. Defaults to 5986.
 
+.PARAMETER LogFilename
+This optional parameter contains a full path and file name to the log file to create.
+If this parameter is not set then a log file will not be created.
+
 .EXAMPLE
  Install-WSManHttpsListener -Issuer 'CN=CONTOSO.COM Issuing CA, DC=CONTOSO, DC=COM'
 Install a WSMan HTTPS listener from an appropriate machine certificate issued by
@@ -32,7 +36,8 @@ Install a WSMan HTTPS listener from an appropriate machine certificate issued by
 
 #>
 [CmdLetBinding()]
-Param (
+param
+(
     [Parameter(Mandatory=$true)]
     [String] $Issuer,
 
@@ -41,29 +46,40 @@ Param (
 
     [Switch] $MatchAlternate = $false,
 
-    [Int] $Port = 5986
+    [Int] $Port = 5986,
+    
+    [ValidateNotNullOrEmpty()]
+    [String] $LogFilename
 ) # param
-Try {
+try
+{
     Get-WSManInstance `
         -ResourceURI winrm/config/Listener `
         -SelectorSet @{Address='*';Transport='HTTPS'}
-    Write-Verbose 'An HTTPS WinRM Listener already exists for this computer.'
-    Return
-} Catch {
+    $Message = 'An HTTPS WinRM Listener already exists for this computer.'
+    Write-Verbose -Message $Message
+    return
+}
+catch
+{
 # An error incidcates a listener doesn't exist so we can install one.
 }
 [String] $Thumbprint = ''
 # First try and find a certificate that is used to the FQDN of the machine
-if ($DNSNameType -in 'Both','FQDN') {
+if ($DNSNameType -in 'Both','FQDN')
+{
     [String] $HostName = [System.Net.Dns]::GetHostByName($ENV:computerName).Hostname
-    if ($MatchAlternate) {
+    if ($MatchAlternate)
+    {
         $Thumbprint = (get-childitem -Path Cert:\localmachine\my | Where-Object { 
 		        ($_.Extensions.EnhancedKeyUsages.FriendlyName -contains 'Server Authentication') -and
 		        ($_.IssuerName.Name -eq $Issuer) -and
 		        ($HostName -in $_.DNSNameList.Unicode) -and
                 ($_.Subject -eq "CN=$HostName") } | Select-Object -First 1
             ).Thumbprint
-    } else {
+    }
+    else
+    {
         $Thumbprint = (get-childitem -Path Cert:\localmachine\my | Where-Object { 
 		        ($_.Extensions.EnhancedKeyUsages.FriendlyName -contains 'Server Authentication') -and
 		        ($_.IssuerName.Name -eq $Issuer) -and
@@ -71,7 +87,8 @@ if ($DNSNameType -in 'Both','FQDN') {
             ).Thumbprint    
     } # if
 }
-if (($DNSNameType -in 'Both','ComputerName') -and -not $Thumbprint) {
+if (($DNSNameType -in 'Both','ComputerName') -and -not $Thumbprint)
+{
     # If could not find an FQDN cert, try for one issued to the computer name
     [String] $HostName = $ENV:ComputerName
     if ($MatchAlternate) {
@@ -81,7 +98,9 @@ if (($DNSNameType -in 'Both','ComputerName') -and -not $Thumbprint) {
 		        ($HostName -in $_.DNSNameList.Unicode) -and
                 ($_.Subject -eq "CN=$HostName") } | Select-Object -First 1
             ).Thumbprint
-    } else {
+    }
+    else
+    {
         $Thumbprint = (get-childitem -Path Cert:\localmachine\my | Where-Object { 
 		        ($_.Extensions.EnhancedKeyUsages.FriendlyName -contains 'Server Authentication') -and
 		        ($_.IssuerName.Name -eq $Issuer) -and
@@ -89,11 +108,17 @@ if (($DNSNameType -in 'Both','ComputerName') -and -not $Thumbprint) {
             ).Thumbprint    
     } # if
 } # if
-if ($Thumbprint) {
+if ($Thumbprint)
+{
     # A certificate was found, so use it to enable the HTTPS WinRM listener
-    Write-Verbose -Message `
-        "Creating new HTTPS WinRM Listener for '$Hostname' with certificate '$Thumbprint' ..."
-    Try {
+    $Message = "Creating new HTTPS WinRM Listener for '$Hostname' with certificate '$Thumbprint'." 
+    Write-Verbose -Message $Message
+    if ($LogFilename)
+    {
+        Add-Content -Path $LogFilename -Value "$(Get-Date) - $($ENV:ComputerName): $Message`n`r" 
+    }
+
+    try {
         New-WSManInstance `
             -ResourceURI winrm/config/Listener `
             -SelectorSet @{Address='*';Transport='HTTPS'} `
@@ -103,12 +128,26 @@ if ($Thumbprint) {
             "The new HTTPS WinRM Listener for '$Hostname' with certificate '$Thumbprint' "
             'has been created.'
             ) -join '')
-    } Catch {
-        Write-Verbose -Message $_
+    }
+    catch
+    {
+        $Message = $_
+        Write-Verbose -Message $Message
+        if ($LogFilename)
+        {
+        Add-Content -Path $LogFilename -Value "$(Get-Date) - $($ENV:ComputerName): $Message`n`r" 
+        }
     } # try
-} else {
-    Write-Verbose -Message ( @(
-        'A computer certificate issued by $Issued to this computer with '
+}
+else
+{
+    $Message = ( @(
+        "A computer certificate issued by '$Issuer' to this computer with "
         'an enhanced key usage of Server Authentication could not be found.'
         ) -join '' )
+    Write-Verbose -Message $Message 
+    if ($LogFilename)
+    {
+        Add-Content -Path $LogFilename -Value "$(Get-Date) - $($ENV:ComputerName): $Message`n`r" 
+    }
 } # if

@@ -1,10 +1,11 @@
 WSManGPOTools
-==========
+=============
 
 ## Install-WSManHttpsListener
 This PowerShell script can be used to install an HTTPS WSMan Listener on a computer with a valid certificate.
 
 ### Changelog
+2015-12-06: Added logging support.
 2015-09-25: Initial Version.
 
 ### Overview
@@ -40,11 +41,16 @@ Default: Both
 ##### MatchAlternate
 The certificate used must also have an alternate subject name containing the DNS name found in
 the subject as well.
-Default:False
+Default: False
 
 #### Port
 This is the port the HTTPS WSMan Listener will be installed onto.
-Default:5986
+Default: 5986
+
+#### LogFilename
+This optional parameter contains a full path and file name to the log file to create.
+If this parameter is not set then a log file will not be created.
+Default: None
 
 ### Examples
 Install a WSMan HTTPS listener from an appropriate machine certificate issued by 'CN=LABBUILDER.COM Issuing CA, DC=LABBUILDER, DC=COM':
