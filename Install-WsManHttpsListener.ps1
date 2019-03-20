@@ -6,6 +6,12 @@
     This script is designed to be called from a Startup/Logon PowerShell GPO.
     The Distinguished Name of the certificate issuer must be passed to the script.
 
+.NOTES
+    File Name	: Install-WsManHttpsListener.ps1
+    Version 	:
+    Author	:
+    Requires	: PowerShell v2
+    
 .PARAMETER Issuer
 The full Distinguished Name of the Issing CA that will have issued the certificate to be used
 for this HTTPS WSMan Listener.
@@ -66,43 +72,43 @@ catch
 }
 [String] $Thumbprint = ''
 # First try and find a certificate that is used to the FQDN of the machine
-if ($DNSNameType -in 'Both','FQDN')
+if ('Both','FQDN' -contains $DNSNameType)
 {
     [String] $HostName = [System.Net.Dns]::GetHostByName($ENV:computerName).Hostname
     if ($MatchAlternate)
     {
         $Thumbprint = (get-childitem -Path Cert:\localmachine\my | Where-Object { 
-		        ($_.Extensions.EnhancedKeyUsages.FriendlyName -contains 'Server Authentication') -and
+		        ($_.Extensions.EnhancedKeyUsages.Value -match '1.3.6.1.5.5.7.3.1') -and # 1.3.6.1.5.5.7.3.1 is the IOD for 'Server Authentication'
 		        ($_.IssuerName.Name -eq $Issuer) -and
-		        ($HostName -in $_.DNSNameList.Unicode) -and
-                ($_.Subject -eq "CN=$HostName") } | Select-Object -First 1
+		        ($_.DNSNameList.Unicode -contains $HostName) -and
+                        ($_.Subject -eq "CN=$HostName") } | Select-Object -First 1
             ).Thumbprint
     }
     else
     {
         $Thumbprint = (get-childitem -Path Cert:\localmachine\my | Where-Object { 
-		        ($_.Extensions.EnhancedKeyUsages.FriendlyName -contains 'Server Authentication') -and
+		        ($_.Extensions.EnhancedKeyUsages.Value -match '1.3.6.1.5.5.7.3.1') -and
 		        ($_.IssuerName.Name -eq $Issuer) -and
-                ($_.Subject -eq "CN=$HostName") } | Select-Object -First 1
+                        ($_.Subject -eq "CN=$HostName") } | Select-Object -First 1
             ).Thumbprint    
     } # if
 }
-if (($DNSNameType -in 'Both','ComputerName') -and -not $Thumbprint)
+if (('Both','ComputerName' -contains $DNSNameType) -and -not $Thumbprint)
 {
     # If could not find an FQDN cert, try for one issued to the computer name
     [String] $HostName = $ENV:ComputerName
     if ($MatchAlternate) {
         $Thumbprint = (get-childitem -Path Cert:\localmachine\my | Where-Object { 
-		        ($_.Extensions.EnhancedKeyUsages.FriendlyName -contains 'Server Authentication') -and
+		        ($_.Extensions.EnhancedKeyUsages.Value -match '1.3.6.1.5.5.7.3.1') -and
 		        ($_.IssuerName.Name -eq $Issuer) -and
-		        ($HostName -in $_.DNSNameList.Unicode) -and
-                ($_.Subject -eq "CN=$HostName") } | Select-Object -First 1
+		        ($_.DNSNameList.Unicode -contains $HostName) -and
+                        ($_.Subject -eq "CN=$HostName") } | Select-Object -First 1
             ).Thumbprint
     }
     else
     {
         $Thumbprint = (get-childitem -Path Cert:\localmachine\my | Where-Object { 
-		        ($_.Extensions.EnhancedKeyUsages.FriendlyName -contains 'Server Authentication') -and
+		        ($_.Extensions.EnhancedKeyUsages.Value -match '1.3.6.1.5.5.7.3.1') -and
 		        ($_.IssuerName.Name -eq $Issuer) -and
                 ($_.Subject -eq "CN=$HostName") } | Select-Object -First 1
             ).Thumbprint    
